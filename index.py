@@ -6,10 +6,7 @@ from sklearn.metrics import (
 )
 
 class CrossValidator:
-    """
-    Wrapper alrededor de tu NeuralNetwork que realiza K-Fold Cross Validation
-    y entrena un modelo final con todos los datos.
-    """
+    """Wrapper around a NeuralNetwork that performs K-Fold cross-validation and trains a final model on all data."""
     
     def __init__(self, 
                  n_features: int,
@@ -19,7 +16,7 @@ class CrossValidator:
                  k_folds: int = 5,
                  epochs: int = 8000,
                  random_state: int = 42):
-        
+        """Initialize CrossValidator with network and training hyperparameters."""
         self.n_features = n_features
         self.hidden_sizes = hidden_sizes
         self.n_output = n_output
@@ -29,17 +26,17 @@ class CrossValidator:
         self.random_state = random_state
 
     def _create_model(self):
-        """Crea una nueva instancia de tu NeuralNetwork"""
+        """Create a new NeuralNetwork instance for the current configuration."""
         return NeuralNetwork(
             n_features=self.n_features,
             hidden_sizes=self.hidden_sizes,
             n_output=self.n_output,
             learning_rate=self.learning_rate,
-            seed=None  # No fijamos seed aquí para que cada fold sea diferente
+            seed=None  # We don't set a seed here so each fold is different
         )
 
     def cross_validate(self, X: np.ndarray, y: np.ndarray, verbose: bool = True):
-        """Realiza K-Fold Cross Validation y muestra métricas detalladas"""
+        """Perform K-Fold cross validation and print detailed metrics. Returns mean F1-score."""
         if y.ndim == 1:
             y = y.reshape(-1, 1)
 
@@ -71,19 +68,19 @@ class CrossValidator:
             
             print(f"Fold {fold}/{n_splits} ".ljust(50, "-"))
             
-            # Crear y entrenar modelo temporal
+            # Create and train temporary model
             model = self._create_model()
             model.fit(X_train, y_train, epochs=self.epochs, verbose=False)
             
-            # Predicciones en validación
+            # Predictions on validation set
             y_pred_prob = model.predict(X_val)
             y_pred_class = model.predict_class(X_val, threshold=0.5)
             
-            # Métricas (multi-label)
+            # Metrics (multi-label)
             acc = accuracy_score(y_val.ravel() if y_val.shape[1]==1 else y_val, 
                                 y_pred_class.ravel() if y_pred_class.shape[1]==1 else y_pred_class)
             
-            # Para multi-output usamos average='macro' o 'samples'
+            # For multi-output we use average='macro' or 'samples'
             prec = precision_score(y_val, y_pred_class, average='macro', zero_division=0)
             rec  = recall_score(y_val, y_pred_class, average='macro', zero_division=0)
             f1   = f1_score(y_val, y_pred_class, average='macro', zero_division=0)
@@ -93,7 +90,7 @@ class CrossValidator:
             fold_recalls.append(rec)
             fold_f1s.append(f1)
             
-            # Matriz de confusión (solo si es una sola salida)
+            # Confusion matrix (only if single output)
             if self.n_output == 1:
                 cm = confusion_matrix(y_val.ravel(), y_pred_class.ravel())
                 print("Matriz de Confusión:")
@@ -118,7 +115,7 @@ class CrossValidator:
         return np.mean(fold_f1s)  # devolvemos F1 como referencia
 
     def fit_final_model(self, X: np.ndarray, y: np.ndarray, verbose: bool = True):
-        """Entrena el modelo final con TODOS los datos"""
+        """Train the final model on ALL the data and return the trained model."""
         print("\n" + "="*70)
         print("ENTRENANDO MODELO FINAL CON TODOS LOS DATOS")
         print("="*70)
@@ -130,6 +127,7 @@ class CrossValidator:
         return self.final_model
 
 class NeuralNetwork:
+    """Simple feedforward neural network with tanh hidden activations and sigmoid output trained with binary cross-entropy."""
     def __init__(
         self,
         n_features: int,
@@ -138,6 +136,7 @@ class NeuralNetwork:
         learning_rate: float = 0.1,
         seed: int | None = None,
     ):
+        """Initialize network parameters and weights using Xavier/Glorot initialization."""
         if seed is not None:
             np.random.seed(seed)
 
@@ -149,7 +148,7 @@ class NeuralNetwork:
 
         layer_sizes = [n_features, *self.hidden_sizes, n_output]
 
-        # Xavier/Glorot para evitar saturacion inicial.
+        # Xavier/Glorot to avoid initial saturation.
         for fan_in, fan_out in zip(layer_sizes[:-1], layer_sizes[1:]):
             limit = np.sqrt(6.0 / (fan_in + fan_out))
             w = np.random.uniform(-limit, limit, size=(fan_in, fan_out))
@@ -159,18 +158,22 @@ class NeuralNetwork:
 
     @staticmethod
     def _sigmoid(z: np.ndarray) -> np.ndarray:
+        """Sigmoid activation function."""
         return 1.0 / (1.0 + np.exp(-z))
 
     @staticmethod
     def _tanh_derivative(a: np.ndarray) -> np.ndarray:
+        """Derivative of tanh activation given activation 'a'."""
         return 1.0 - (a ** 2)
 
     @staticmethod
     def _binary_cross_entropy(y_true: np.ndarray, y_prob: np.ndarray) -> float:
+        """Compute binary cross-entropy loss between true labels and predicted probabilities."""
         y_prob = np.clip(y_prob, 1e-7, 1.0 - 1e-7)
         return float(-np.mean(y_true * np.log(y_prob) + (1.0 - y_true) * np.log(1.0 - y_prob)))
 
     def forward(self, x: np.ndarray) -> tuple[list[np.ndarray], list[np.ndarray]]:
+        """Perform a forward pass and return (activations, z_values)."""
         activations = [x]
         z_values = []
 
@@ -189,13 +192,16 @@ class NeuralNetwork:
         return activations, z_values
 
     def predict(self, x: np.ndarray) -> np.ndarray:
+        """Return the network's output probabilities for input `x`."""
         activations, _ = self.forward(x)
         return activations[-1]
 
     def predict_class(self, x: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+        """Return binary class predictions using the given threshold."""
         return (self.predict(x) >= threshold).astype(int)
 
     def fit(self, x: np.ndarray, y: np.ndarray, epochs: int = 10000, verbose: bool = True) -> None:
+        """Train the network using gradient descent with binary cross-entropy loss."""
         if y.ndim == 1:
             y = y.reshape(-1, 1)
 
@@ -207,10 +213,9 @@ class NeuralNetwork:
 
             deltas: list[np.ndarray | None] = [None] * len(self.weights)
 
-            # Para BCE + sigmoid en salida: dL/dz = y_pred - y
+            # For BCE + sigmoid at output: dL/dz = y_pred - y
             deltas[-1] = y_pred - y
-
-            # Backprop en capas ocultas
+            # Backprop on hidden layers
             for layer_idx in range(len(self.weights) - 2, -1, -1):
                 back_signal = deltas[layer_idx + 1] @ self.weights[layer_idx + 1].T
                 deltas[layer_idx] = back_signal * self._tanh_derivative(activations[layer_idx + 1])
