@@ -1,10 +1,17 @@
-import numpy as np
-from sklearn.model_selection import KFold
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score, f1_score,
-    confusion_matrix, classification_report
-)
+import numpy as np  # Core library for array operations and numerical computations
 
+# K-Fold cross-validation for model evaluation
+from sklearn.model_selection import KFold
+
+# Performance metrics for multi-label/binary classification
+from sklearn.metrics import (
+    accuracy_score,        # Overall accuracy
+    precision_score,       # Precision score (macro average)
+    recall_score,          # Recall score (macro average)
+    f1_score,              # F1-Score (macro average)
+    confusion_matrix,      # Confusion matrix (used when n_output == 1)
+    classification_report  # Detailed report with precision, recall, f1 per class
+)
 class CrossValidator:
     """Wrapper around a NeuralNetwork that performs K-Fold cross-validation and trains a final model on all data."""
     
